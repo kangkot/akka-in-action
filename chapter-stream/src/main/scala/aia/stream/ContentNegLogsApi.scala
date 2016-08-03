@@ -18,6 +18,7 @@ import akka.util.ByteString
 import akka.stream.{ ActorAttributes, ActorMaterializer, IOResult }
 import akka.stream.scaladsl.{ FileIO, BidiFlow, Flow, Framing, Keep, Sink, Source }
 
+import akka.http.scaladsl.common.EntityStreamingSupport
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import akka.http.scaladsl.marshalling.Marshal
 import akka.http.scaladsl.model._
@@ -49,11 +50,13 @@ class ContentNegLogsApi(
   //<start id="postRoute"/>
   implicit val unmarshaller = EventUnmarshaller.create(maxLine, maxJsObject) //<co id="implicit_unmarshaller"/>
 
+  implicit val jsonStreamingSupport = EntityStreamingSupport.json()
+
   def postRoute = 
     pathPrefix("logs" / Segment) { logId =>
       pathEndOrSingleSlash {
         post {
-          entity(as[Source[Event, _]]) { src => //<co id="use_implicit_unmarshaller"/>
+          entity(asSourceOf[Event]) { src => //<co id="use_implicit_unmarshaller"/>
             onComplete(
               src.via(outFlow)
                 .toMat(logFileSink(logId))(Keep.right)
